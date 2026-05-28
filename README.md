@@ -38,7 +38,7 @@ Then either:
 export DATAHIKE_LIB=/absolute/path/to/libdatahike.so
 ```
 
-or pass `libraryPath` to `Datahike.open()`.
+or pass `libraryPath` to `DatahikeClient.open()`.
 
 ## Example
 
