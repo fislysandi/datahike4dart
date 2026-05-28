@@ -1,0 +1,23 @@
+name: datahike4dart_example
+publish_to: none
+description: Flutter desktop example for datahike4dart.
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.0
+  flutter: ^3.16.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  datahike4dart:
+    path: ..
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

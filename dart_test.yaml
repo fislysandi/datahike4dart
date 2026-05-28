@@ -1,0 +1,3 @@
+# Limit test concurrency to avoid GraalVM native-image stack exhaustion
+# when multiple DatahikeClient instances are created simultaneously.
+concurrency: 2

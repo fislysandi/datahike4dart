@@ -4,6 +4,23 @@ Mobile is not part of the desktop MVP. This document tracks the feasibility inve
 
 The Dart FFI layer is suitable for mobile. The main unknown is whether Datahike's native `libdatahike` can be cross-compiled and packaged reliably for each mobile platform.
 
+## Current findings (2026-05-28)
+
+### Native library size
+
+The official Linux amd64 `libdatahike.so` is **~145 MB uncompressed**. For mobile, this is a significant size concern:
+
+- Android APK/AAB size budget is typically ~50-150 MB total.
+- iOS apps over ~200 MB face App Store scrutiny.
+- The library would need to be stripped or split-per-ABI to reduce impact.
+
+### Threading model
+
+GraalVM native images use OS threads for isolates. In testing, running multiple Datahike clients concurrently from different Dart isolates has caused **native stack exhaustion** (`StackOverflowError` from the GraalVM layer). This suggests:
+
+- Mobile apps should use a **single shared worker isolate** (via `DatahikeIsolate`) for all Datahike work.
+- Avoid creating multiple `DatahikeClient` instances on mobile.
+
 ## Android
 
 Target proof:
@@ -18,7 +35,7 @@ Open questions:
 - Required GraalVM/native-image version and Android target support.
 - Android NDK/toolchain configuration.
 - Minimum Android API level.
-- Native library size impact.
+- Native library size impact (~145 MB per ABI).
 - Whether native calls need isolate/threading wrappers to avoid blocking UI code.
 
 ## iOS

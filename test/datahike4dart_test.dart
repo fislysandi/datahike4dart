@@ -26,7 +26,7 @@ void main() {
     if (Platform.environment.containsKey('DATAHIKE_LIB')) return;
     expect(
       () => Datahike.openRaw(libraryPath: '/missing/libdatahike.so'),
-      throwsA(isA<ArgumentError>()),
+      throwsA(isA<DatahikeException>()),
     );
   });
 }

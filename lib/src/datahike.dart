@@ -1,8 +1,10 @@
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:fpdart/fpdart.dart';
+
+import 'edn.dart';
+import 'native_library.dart';
 
 /// Supported native serialization formats.
 enum DatahikeFormat {
@@ -75,7 +77,7 @@ final class DatahikeInput {
 }
 
 /// A typed failure returned by the public functional API.
-sealed class DatahikeFailure {
+abstract class DatahikeFailure {
   /// Creates a failure with the given message and optional cause.
   const DatahikeFailure(this.message, [this.cause]);
 
@@ -153,7 +155,9 @@ final class DatahikeClient {
       Either.tryCatch(
         () => DatahikeClient._(Datahike.openRaw(libraryPath: libraryPath)),
         (error, _) => DatahikeLoadFailure(
-          'Failed to load or initialize Datahike native library.',
+          error is DatahikeException
+              ? error.message
+              : 'Failed to load or initialize Datahike native library.',
           error,
         ),
       );
@@ -204,6 +208,39 @@ final class DatahikeClient {
         )
       : _capture(() => _raw.q(queryEdn, inputs, outputFormat: outputFormat));
 
+  /// Alias for [q] that makes it explicit you are getting raw EDN.
+  DatahikeResult<String> qRaw(
+    String queryEdn,
+    List<DatahikeInput> inputs, {
+    DatahikeFormat outputFormat = DatahikeFormat.edn,
+  }) => q(queryEdn, inputs, outputFormat: outputFormat);
+
+  /// Executes a Datalog query and parses the result into rows.
+  ///
+  /// Returns `Either<DatahikeFailure, List<List<Object?>>>`.
+  /// Throws [DatahikeException] if the EDN cannot be parsed.
+  DatahikeResult<List<List<Object?>>> qRows(
+    String queryEdn,
+    List<DatahikeInput> inputs, {
+    DatahikeFormat outputFormat = DatahikeFormat.edn,
+  }) => q(queryEdn, inputs, outputFormat: outputFormat).map((edn) {
+    final parsed = parseEdn(edn);
+    if (parsed == null) return <List<Object?>>[];
+    if (parsed is Set) {
+      return parsed
+          .map((row) => (row as List).cast<Object?>().toList())
+          .toList();
+    }
+    if (parsed is List) {
+      return parsed
+          .map((row) => (row as List).cast<Object?>().toList())
+          .toList();
+    }
+    throw DatahikeException(
+      'Unexpected query result shape: ${parsed.runtimeType}',
+    );
+  });
+
   DatahikeResult<String> pull(
     DatahikeInput input,
     String selectorEdn,
@@ -228,6 +265,44 @@ final class DatahikeClient {
     int eid, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
   }) => _capture(() => _raw.entity(input, eid, outputFormat: outputFormat));
+
+  /// Pulls an entity and parses the result into a Dart map.
+  ///
+  /// Returns `null` when the entity does not exist (Datahike returns `nil`).
+  DatahikeResult<Map<Object?, Object?>?> pullMap(
+    DatahikeInput input,
+    String selectorEdn,
+    int eid, {
+    DatahikeFormat outputFormat = DatahikeFormat.edn,
+  }) => pull(input, selectorEdn, eid, outputFormat: outputFormat).map((edn) {
+    final parsed = parseEdn(edn);
+    if (parsed == null) return null;
+    return (parsed as Map).cast<Object?, Object?>();
+  });
+
+  /// Returns an entity map for [eid], or `null` if the entity does not exist.
+  DatahikeResult<Map<Object?, Object?>?> entityMap(
+    DatahikeInput input,
+    int eid, {
+    DatahikeFormat outputFormat = DatahikeFormat.edn,
+  }) => entity(input, eid, outputFormat: outputFormat).map((edn) {
+    final parsed = parseEdn(edn);
+    if (parsed == null) return null;
+    return (parsed as Map).cast<Object?, Object?>();
+  });
+
+  /// Returns datoms parsed into a list of rows.
+  DatahikeResult<List<List<Object?>>> datomsList(
+    DatahikeInput input,
+    String indexEdn, {
+    DatahikeFormat outputFormat = DatahikeFormat.edn,
+  }) => datoms(input, indexEdn, outputFormat: outputFormat).map((edn) {
+    final parsed = parseEdn(edn);
+    if (parsed == null) return <List<Object?>>[];
+    return (parsed as List)
+        .map((row) => (row as List).cast<Object?>().toList())
+        .toList();
+  });
 
   DatahikeResult<String> metrics(
     DatahikeInput input, {
@@ -370,14 +445,17 @@ final class Datahike {
   /// Resolution order:
   /// 1. explicit [libraryPath]
   /// 2. `DATAHIKE_LIB` environment variable
-  /// 3. platform default name (`libdatahike.so`, `libdatahike.dylib`, or
+  /// 3. app-local conventional paths (e.g. `.native/` under the current
+  ///    working directory)
+  /// 4. platform default name (`libdatahike.so`, `libdatahike.dylib`, or
   ///    `datahike.dll`) from the dynamic loader path
   factory Datahike.openRaw({String? libraryPath}) {
-    final path = libraryPath ?? Platform.environment['DATAHIKE_LIB'];
-    final library = path == null || path.isEmpty
-        ? DynamicLibrary.open(_defaultLibraryName())
-        : DynamicLibrary.open(path);
-    return Datahike._(_DatahikeBindings(library), library);
+    try {
+      final library = DatahikeNativeLibrary.open(libraryPath: libraryPath);
+      return Datahike._(_DatahikeBindings(library), library);
+    } on DatahikeLibraryException catch (e) {
+      throw DatahikeException(e.message);
+    }
   }
 
   final _DatahikeBindings _bindings;
@@ -663,15 +741,19 @@ final class Datahike {
       throw StateError('Datahike client is closed.');
     }
     final callback = _CallbackCapture();
-    invoke(callback.nativeReader);
-    final output = callback.output;
-    if (output == null) {
-      throw const DatahikeException('Native call did not return a value.');
+    try {
+      invoke(callback.nativeReader);
+      final output = callback.output;
+      if (output == null) {
+        throw const DatahikeException('Native call did not return a value.');
+      }
+      if (output.startsWith('exception:')) {
+        throw DatahikeException(output.substring('exception:'.length));
+      }
+      return output;
+    } finally {
+      callback.dispose();
     }
-    if (output.startsWith('exception:')) {
-      throw DatahikeException(output.substring('exception:'.length));
-    }
-    return output;
   }
 }
 
@@ -680,19 +762,18 @@ typedef _OutputReaderNative =
 typedef _OutputReaderDart = Void Function(Pointer<Utf8>);
 
 final class _CallbackCapture {
-  _CallbackCapture() {
-    _active = this;
-  }
-
-  static _CallbackCapture? _active;
-
   String? output;
 
-  _OutputReaderNative get nativeReader =>
-      Pointer.fromFunction<_OutputReaderDart>(_readOutput);
+  late final _nativeCallable = NativeCallable<_OutputReaderDart>.isolateLocal((
+    Pointer<Utf8> ptr,
+  ) {
+    output = ptr.toDartString();
+  });
 
-  static void _readOutput(Pointer<Utf8> output) {
-    _active?.output = output.toDartString();
+  _OutputReaderNative get nativeReader => _nativeCallable.nativeFunction;
+
+  void dispose() {
+    _nativeCallable.close();
   }
 }
 
@@ -1310,11 +1391,60 @@ final class _DatahikeBindings {
   }
 }
 
-String _defaultLibraryName() {
-  if (Platform.isMacOS) return 'libdatahike.dylib';
-  if (Platform.isWindows) return 'datahike.dll';
-  return 'libdatahike.so';
-}
-
 String _bareKeywordName(String value) =>
     value.startsWith(':') ? value.substring(1) : value;
+
+/// A single Datahike datom: `[e a v t]` or `[e a v t added?]`.
+///
+/// Created by parsing the EDN rows returned from [DatahikeClient.datomsList].
+final class Datom {
+  const Datom({
+    required this.e,
+    required this.a,
+    required this.v,
+    required this.t,
+    this.added,
+  });
+
+  /// Entity id.
+  final int e;
+
+  /// Attribute keyword, e.g. `:name`.
+  final String a;
+
+  /// Value.
+  final Object? v;
+
+  /// Transaction id or transaction time.
+  final Object? t;
+
+  /// Whether this datom was added (`true`) or retracted (`false`).
+  final bool? added;
+
+  /// Parses an EDN datom row into a typed [Datom].
+  factory Datom.fromRow(List<Object?> row) {
+    return Datom(
+      e: row[0] as int,
+      a: row[1] as String,
+      v: row[2],
+      t: row[3],
+      added: row.length > 4 ? row[4] as bool? : null,
+    );
+  }
+
+  @override
+  String toString() =>
+      'Datom(e: $e, a: $a, v: $v, t: $t${added != null ? ', added: $added' : ''})';
+
+  @override
+  bool operator ==(Object other) =>
+      other is Datom &&
+      other.e == e &&
+      other.a == a &&
+      other.v == v &&
+      other.t == t &&
+      other.added == added;
+
+  @override
+  int get hashCode => Object.hash(e, a, v, t, added);
+}
