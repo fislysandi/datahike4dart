@@ -122,7 +122,11 @@ final class DatahikeInvalidInputFailure extends DatahikeFailure {
 }
 
 /// Thrown by the raw FFI layer when Datahike returns a native exception string.
+///
+/// This exception is thrown by the Datahike class when the native library
+/// returns a string starting with 'exception:'.
 final class DatahikeException implements Exception {
+  /// Creates an exception with the given message.
   const DatahikeException(this.message);
 
   final String message;
@@ -132,6 +136,8 @@ final class DatahikeException implements Exception {
 }
 
 /// Functional result type used by the public API.
+///
+/// Represents either a [DatahikeFailure] or a successful value of type T.
 typedef DatahikeResult<T> = Either<DatahikeFailure, T>;
 
 /// Functional API for Datahike.
