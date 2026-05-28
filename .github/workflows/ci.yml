@@ -11,11 +11,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        sdk: [stable, beta]
-        include:
-          - os: ubuntu-latest
-            platform: linux-amd64
+        os: [ubuntu-latest, macos-latest]
+        sdk: [stable]
 
     runs-on: ${{ matrix.os }}
 
@@ -30,7 +27,7 @@ jobs:
         run: dart pub get
 
       - name: Verify formatting
-        run: dart format --set-exit-if-changed lib test example tool
+        run: dart format --set-exit-if-changed lib test example tool example_flutter
 
       - name: Analyze
         run: dart analyze --fatal-infos
