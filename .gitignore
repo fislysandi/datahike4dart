@@ -7,3 +7,4 @@ coverage/
 .omx/metrics.json
 *.log
 .opencode/
+.sisyphus/
