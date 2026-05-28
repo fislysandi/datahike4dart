@@ -5,6 +5,7 @@ coverage/
 .omx/logs/
 .omx/state/
 .omx/metrics.json
-*.log
 .opencode/
 .sisyphus/
+.native/
+*.log

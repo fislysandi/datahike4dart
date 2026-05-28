@@ -1,20 +1,19 @@
 # datahike4dart
 
-Dart bindings for [Datahike](https://datahike.io/) through Datahike's native C library (`libdatahike`).
+Dart FFI bindings for [Datahike](https://datahike.io/), a durable Datalog database.
 
-Datahike is a durable Datalog database inspired by Datomic/DataScript. This package exposes the native Datahike API to Dart using `dart:ffi`.
+## Overview
 
-## Status
+Datahike is a durable, embeddable Datalog database inspired by Datomic and DataScript. This package provides Dart bindings to Datahike's native C library (`libdatahike`) via `dart:ffi`, enabling Dart CLI/server and Flutter desktop apps to use Datahike as a local database.
 
-Early binding layer. It currently wraps the core native functions exposed by Datahike's `libdatahike`:
+## Features
 
-- database lifecycle: `createDatabase`, `deleteDatabase`, `databaseExists`
-- writes: `transact`, `mergeDb`
-- queries: `q`, `pull`, `pullMany`, `entity`
-- indexes/metadata: `datoms`, `seekDatoms`, `indexRange`, `schema`, `reverseSchema`, `metrics`
-- versioning: `commitId`, `parentCommitIds`, `branch`, `branches`, `deleteBranch`, `gcStorage`
-
-The wrapper sends and receives EDN strings by default. JSON/CBOR are supported by the native API too, but EDN is the most complete representation for Datahike keywords, UUIDs, sets, and query forms.
+- **Database lifecycle**: create, delete, and check database existence
+- **Data writes**: transact data and merge databases
+- **Data queries**: execute Datalog queries, pull entities, and read entities
+- **Indexes and metadata**: access schema, reverse schema, metrics, and index data
+- **Versioning**: read commits, branches, parent commit ids, and run storage GC
+- **Functional API**: `fpdart` `Either<DatahikeFailure, T>` results for explicit error handling
 
 ## Native library requirement
 
@@ -24,13 +23,7 @@ You need Datahike's native library on your machine:
 - macOS: `libdatahike.dylib`
 - Windows: `datahike.dll`
 
-Build it from the Datahike repository with GraalVM/native-image, for example:
-
-```bash
-git clone https://github.com/replikativ/datahike.git
-cd datahike
-bb ni-compile
-```
+Build it from the Datahike repository or download a matching release artifact. See [native build notes](doc/native-build.md).
 
 Then either:
 
@@ -40,7 +33,7 @@ export DATAHIKE_LIB=/absolute/path/to/libdatahike.so
 
 or pass `libraryPath` to `DatahikeClient.open()`.
 
-## Example
+## Quick start
 
 ```dart
 import 'package:datahike4dart/datahike4dart.dart';
@@ -51,15 +44,15 @@ void main() {
       ':schema-flexibility :write}';
 
   final result = DatahikeClient.open().flatMap((datahike) {
-    datahike.createDatabase(config);
-    datahike.transact(config,
-        '[{:db/ident :name :db/valueType :db.type/string :db/cardinality :db.cardinality/one}]');
-    datahike.transact(config, '[{:name "Alice"}]');
-
-    final queryResult = datahike.q(
-      '[:find ?e ?name :where [?e :name ?name]]',
-      [DatahikeInput.database(config)],
-    );
+    final queryResult = datahike
+        .createDatabase(config)
+        .flatMap((_) => datahike.transact(config,
+            '[{:db/ident :name :db/valueType :db.type/string :db/cardinality :db.cardinality/one}]'))
+        .flatMap((_) => datahike.transact(config, '[{:name "Alice"}]'))
+        .flatMap((_) => datahike.q(
+              '[:find ?e ?name :where [?e :name ?name]]',
+              [DatahikeInput.database(config)],
+            ));
     datahike.close();
     return queryResult;
   });
@@ -71,20 +64,43 @@ void main() {
 }
 ```
 
-## API style
+## API layers
 
-The preferred public API is functional-first and uses `fpdart`:
+### `DatahikeClient` — recommended
+
+Functional-first API using `fpdart`:
 
 - `DatahikeClient.open()` returns `Either<DatahikeFailure, DatahikeClient>`.
 - Operations return `Either<DatahikeFailure, T>`.
-- Native Datahike errors are represented as typed failures such as `DatahikeLoadFailure` and `DatahikeNativeFailure`.
+- Native failures are represented as typed failures such as `DatahikeLoadFailure`, `DatahikeNativeFailure`, `DatahikeClosedFailure`, and `DatahikeInvalidInputFailure`.
 
-The lower-level raw FFI client is available as `Datahike.openRaw()` for tests and advanced use. It may throw `DatahikeException` when native Datahike returns an `exception:` response.
+### `Datahike` — raw FFI
 
-## Platform scope
+Lower-level direct FFI bindings are available via `Datahike.openRaw()`. This layer may throw `DatahikeException` and is mainly for tests or advanced users.
 
-MVP target: Dart CLI/server and Flutter desktop on native platforms that can load Datahike's native library.
+## Platform support
 
-Mobile target: Android/iOS will be investigated after desktop works. The Dart FFI layer is suitable for mobile, but Datahike native library cross-compilation and packaging still need proof.
+- ✅ Linux x64: create/transact/query integration tested with Datahike `libdatahike-0.8.1689-linux-amd64`.
+- 🟡 macOS/Windows desktop: expected to work with matching native release artifacts; not yet verified here.
+- 🟡 Android/iOS: planned after desktop; Dart FFI is suitable, but native Datahike cross-compilation/packaging still needs proof.
+- ❌ Web: not supported by this FFI approach.
 
-Not supported by this FFI package: Flutter Web / Dart Web.
+See [mobile support notes](doc/mobile.md).
+
+## Testing
+
+Unit tests do not require the native library:
+
+```bash
+dart test
+```
+
+Native integration tests require `DATAHIKE_LIB`:
+
+```bash
+DATAHIKE_LIB=/absolute/path/to/libdatahike.so dart test test/native_integration_test.dart
+```
+
+## License
+
+MIT.

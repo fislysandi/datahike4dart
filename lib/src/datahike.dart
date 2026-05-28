@@ -6,8 +6,13 @@ import 'package:fpdart/fpdart.dart';
 
 /// Supported native serialization formats.
 enum DatahikeFormat {
+  /// Extensible Data Notation format.
   edn('edn'),
+
+  /// JavaScript Object Notation format.
   json('json'),
+
+  /// Concise Binary Object Representation format.
   cbor('cbor');
 
   const DatahikeFormat(this.nativeName);
@@ -20,6 +25,7 @@ enum DatahikeFormat {
 /// Native Datahike accepts multiple input sources. For ordinary queries use
 /// [DatahikeInput.database] with the database config EDN.
 final class DatahikeInput {
+  /// Creates a DatahikeInput with the given format and value.
   const DatahikeInput(this.format, this.value);
 
   /// Load the current database value by connecting with [configEdn].
@@ -29,18 +35,26 @@ final class DatahikeInput {
   const DatahikeInput.history(String configEdn) : this('history', configEdn);
 
   /// Load the database as of [timestamp].
+  ///
+  /// Returns an input that represents the database state at the given timestamp.
   factory DatahikeInput.asOf(String configEdn, DateTime timestamp) =>
       DatahikeInput('asof:${timestamp.millisecondsSinceEpoch}', configEdn);
 
   /// Load the database since [timestamp].
+  ///
+  /// Returns an input that represents the database state after the given timestamp.
   factory DatahikeInput.since(String configEdn, DateTime timestamp) =>
       DatahikeInput('since:${timestamp.millisecondsSinceEpoch}', configEdn);
 
   /// Load the database at a named branch.
+  ///
+  /// Returns an input that represents the database at the specified branch.
   factory DatahikeInput.branch(String configEdn, String branchName) =>
       DatahikeInput('branch:${_bareKeywordName(branchName)}', configEdn);
 
   /// Load the database at a commit UUID.
+  ///
+  /// Returns an input that represents the database at the specified commit.
   factory DatahikeInput.commit(String configEdn, String commitUuid) =>
       DatahikeInput('commit:$commitUuid', configEdn);
 
@@ -53,12 +67,16 @@ final class DatahikeInput {
   /// Pass raw CBOR as a base64/native string value.
   const DatahikeInput.cbor(String cbor) : this('cbor', cbor);
 
+  /// The input format identifier (e.g., 'db', 'history', 'edn', 'json', 'cbor').
   final String format;
+
+  /// The input value (e.g., EDN string, JSON string, CBOR string).
   final String value;
 }
 
 /// A typed failure returned by the public functional API.
 sealed class DatahikeFailure {
+  /// Creates a failure with the given message and optional cause.
   const DatahikeFailure(this.message, [this.cause]);
 
   final String message;
@@ -69,22 +87,37 @@ sealed class DatahikeFailure {
 }
 
 /// Failed to load or initialize the native Datahike library.
+///
+/// This occurs when the native library cannot be found, fails to load,
+/// or initialization fails for any reason.
 final class DatahikeLoadFailure extends DatahikeFailure {
+  /// Creates a load failure with the given message and optional cause.
   const DatahikeLoadFailure(super.message, [super.cause]);
 }
 
 /// Datahike returned a native exception.
+///
+/// This occurs when Datahike's native code throws an exception that
+/// is returned as a string starting with 'exception:'.
 final class DatahikeNativeFailure extends DatahikeFailure {
+  /// Creates a native failure with the given message and optional cause.
   const DatahikeNativeFailure(super.message, [super.cause]);
 }
 
 /// The client was used after it was closed.
+///
+/// This occurs when attempting to use a DatahikeClient after calling close().
 final class DatahikeClosedFailure extends DatahikeFailure {
+  /// Creates a closed failure with the given message and optional cause.
   const DatahikeClosedFailure(super.message, [super.cause]);
 }
 
 /// The caller supplied invalid input before Datahike was invoked.
+///
+/// This occurs when the input parameters are invalid (e.g., null values,
+/// incorrect types) before being passed to the native Datahike library.
 final class DatahikeInvalidInputFailure extends DatahikeFailure {
+  /// Creates an invalid input failure with the given message and optional cause.
   const DatahikeInvalidInputFailure(super.message, [super.cause]);
 }
 
