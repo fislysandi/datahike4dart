@@ -251,6 +251,10 @@ final class _EdnParser {
       }
     }
     final raw = _input.substring(start, _position);
+    // Consume optional Clojure BigDecimal (M) or BigInt (N) suffix
+    if (!isAtEnd && (_input[_position] == 'M' || _input[_position] == 'N')) {
+      _position++;
+    }
     if (hasDot) {
       return double.parse(raw);
     }
