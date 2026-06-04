@@ -103,6 +103,10 @@ Functional-first API using `fpdart`:
 
 Lower-level direct FFI bindings are available via `Datahike.openRaw()`. This layer may throw `DatahikeException` and is mainly for tests or advanced users.
 
+### ClojureDart API
+
+A ClojureDart-friendly entry point with exception-based error handling and top-level functions is documented in the [ClojureDart interop guide](doc/clojuredart.md).
+
 ### Config builders
 
 Instead of writing EDN by hand, use the typed config builders:
@@ -153,6 +157,120 @@ final datoms = datahike.datomsList(input, ':eavt'); // Either<..., List<List<Obj
 ```
 
 Raw EDN methods (`q`, `pull`, `entity`, `datoms`) remain available.
+
+### Pull queries
+
+Recursive pull queries let you fetch nested entity structures in one call:
+
+```dart
+final result = datahike.pull(
+  DatahikeInput.database(config),
+  '[*]',                    // pull pattern: all attributes
+  1,                        // entity id
+);
+// Either<DatahikeFailure, String>  (raw EDN)
+
+final parsed = datahike.pullMap(
+  DatahikeInput.database(config),
+  '[:person/name :person/age]',
+  1,
+);
+// Either<DatahikeFailure, Map<Object?, Object?>?>
+```
+
+Use `pullMany` to fetch multiple entities:
+
+```dart
+final result = datahike.pullMany(
+  DatahikeInput.database(config),
+  '[:person/name :person/age]',
+  '[1 2 3]',  // EDN vector of entity ids
+);
+```
+
+### Time-travel queries
+
+Datahike is an immutable database — you can query any past state. Use `DatahikeInput`
+variants to navigate time:
+
+```dart
+// Current state (default)
+DatahikeInput.database(config);
+
+// Full history (includes retracted datoms)
+DatahikeInput.history(config);
+
+// State at a specific point in time
+DatahikeInput.asOf(config, DateTime(2026, 1, 1));
+
+// State since a point in time
+DatahikeInput.since(config, DateTime(2026, 6, 1));
+
+// State at a named branch
+DatahikeInput.branch(config, ':experiment');
+
+// State at a specific commit
+DatahikeInput.commit(config, 'a1b2c3d4-...');
+```
+
+### Datoms
+
+The atomic unit of Datahike's data model. Query index data with typed results:
+
+```dart
+final result = datahike.datomsList(
+  DatahikeInput.database(config),
+  ':eavt',  // index order: entity, attribute, value, transaction
+);
+// Either<DatahikeFailure, List<List<Object?>>>
+
+// Convert to typed Datom objects:
+result.map((rows) => rows.map(Datom.fromRow).toList());
+// Each Datom has: .e (entity), .a (attribute), .v (value), .t (tx), .added
+```
+
+Available indexes: `:eavt`, `:aevt`, `:avet`, `:vaet`.
+
+### Branching
+
+Datahike supports branching for isolated data exploration:
+
+```dart
+// List branches
+datahike.branches(config);
+
+// Create a new branch from an existing one
+datahike.branch(config, ':main', ':experiment');
+
+// Delete a branch
+datahike.deleteBranch(config, ':experiment');
+```
+
+### Output formats
+
+All read operations support three serialization formats:
+
+```dart
+// EDN (default) — native Datahike format
+datahike.q(query, inputs, outputFormat: DatahikeFormat.edn);
+
+// JSON — easier interoperability
+datahike.q(query, inputs, outputFormat: DatahikeFormat.json);
+
+// CBOR — compact binary
+datahike.q(query, inputs, outputFormat: DatahikeFormat.cbor);
+```
+
+### Storage GC
+
+Historical data older than a given transaction can be garbage-collected:
+
+```dart
+// Remove all data before January 1st, 2026
+datahike.gcStorage(config, DateTime(2026, 1, 1));
+```
+
+**This is a destructive operation.** Use with caution.
 
 ## Native library resolution
 

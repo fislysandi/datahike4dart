@@ -1,7 +1,7 @@
 name: datahike4dart
 description: Dart FFI bindings for libdatahike, the native Datahike database library.
 version: 0.1.0
-repository: https://github.com/your-org/datahike4dart
+repository: https://github.com/fislysandi/datahike4dart
 
 environment:
   sdk: ^3.10.0
