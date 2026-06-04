@@ -34,29 +34,58 @@ final class DatahikeInput {
   const DatahikeInput.database(String configEdn) : this('db', configEdn);
 
   /// Load the full history database by connecting with [configEdn].
+  ///
+  /// Unlike [DatahikeInput.database], this includes all historical versions
+  /// of entities, enabling queries across the full transaction log.
+  ///
+  /// ```dart
+  /// final input = DatahikeInput.history(config);
+  /// final result = datahike.q('[:find ?e ?v :where [?e :name ?v]]', [input]);
+  /// ```
   const DatahikeInput.history(String configEdn) : this('history', configEdn);
 
   /// Load the database as of [timestamp].
   ///
   /// Returns an input that represents the database state at the given timestamp.
+  ///
+  /// ```dart
+  /// final input = DatahikeInput.asOf(config, DateTime(2026, 1, 1));
+  /// final result = datahike.q('[:find ?e :where [?e :name ?n]]', [input]);
+  /// ```
   factory DatahikeInput.asOf(String configEdn, DateTime timestamp) =>
       DatahikeInput('asof:${timestamp.millisecondsSinceEpoch}', configEdn);
 
   /// Load the database since [timestamp].
   ///
-  /// Returns an input that represents the database state after the given timestamp.
+  /// Returns an input that represents the database state after the given
+  /// timestamp (including changes made after it).
+  ///
+  /// ```dart
+  /// final input = DatahikeInput.since(config, DateTime(2026, 6, 1));
+  /// final result = datahike.q('[:find ?e :where [?e :name ?n]]', [input]);
+  /// ```
   factory DatahikeInput.since(String configEdn, DateTime timestamp) =>
       DatahikeInput('since:${timestamp.millisecondsSinceEpoch}', configEdn);
 
   /// Load the database at a named branch.
   ///
   /// Returns an input that represents the database at the specified branch.
+  ///
+  /// ```dart
+  /// final input = DatahikeInput.branch(config, ':experiment');
+  /// final result = datahike.q('[:find ?e :where [?e :name ?n]]', [input]);
+  /// ```
   factory DatahikeInput.branch(String configEdn, String branchName) =>
       DatahikeInput('branch:${_bareKeywordName(branchName)}', configEdn);
 
   /// Load the database at a commit UUID.
   ///
   /// Returns an input that represents the database at the specified commit.
+  ///
+  /// ```dart
+  /// final input = DatahikeInput.commit(config, 'a1b2c3d4-...');
+  /// final result = datahike.q('[:find ?e :where [?e :name ?n]]', [input]);
+  /// ```
   factory DatahikeInput.commit(String configEdn, String commitUuid) =>
       DatahikeInput('commit:$commitUuid', configEdn);
 
@@ -241,6 +270,18 @@ final class DatahikeClient {
     );
   });
 
+  /// Executes a recursive pull query for entity [eid] using [selectorEdn].
+  ///
+  /// Returns the result as a raw EDN string. Use [pullMap] to get a parsed
+  /// Dart map.
+  ///
+  /// ```dart
+  /// final result = datahike.pull(
+  ///   DatahikeInput.database(config),
+  ///   '[:person/name :person/age]',
+  ///   1,
+  /// );
+  /// ```
   DatahikeResult<String> pull(
     DatahikeInput input,
     String selectorEdn,
@@ -250,6 +291,11 @@ final class DatahikeClient {
     () => _raw.pull(input, selectorEdn, eid, outputFormat: outputFormat),
   );
 
+  /// Pulls multiple entities matching [eidsEdn] using [selectorEdn].
+  ///
+  /// [eidsEdn] is an EDN vector of entity ids, e.g. `[1 2 3]`.
+  ///
+  /// Returns the result as a raw EDN string.
   DatahikeResult<String> pullMany(
     DatahikeInput input,
     String selectorEdn,
@@ -260,6 +306,10 @@ final class DatahikeClient {
         _raw.pullMany(input, selectorEdn, eidsEdn, outputFormat: outputFormat),
   );
 
+  /// Returns a raw EDN representation of entity [eid].
+  ///
+  /// Use [entityMap] to get the result as a parsed Dart map.
+  /// Returns the full entity map for the given entity id.
   DatahikeResult<String> entity(
     DatahikeInput input,
     int eid, {
@@ -292,6 +342,15 @@ final class DatahikeClient {
   });
 
   /// Returns datoms parsed into a list of rows.
+  ///
+  /// Use [Datom.fromRow] to convert each row to a typed [Datom] object.
+  ///
+  /// ```dart
+  /// final result = datahike.datomsList(
+  ///   DatahikeInput.database(config),
+  ///   ':eavt',
+  /// );
+  /// ```
   DatahikeResult<List<List<Object?>>> datomsList(
     DatahikeInput input,
     String indexEdn, {
@@ -304,31 +363,43 @@ final class DatahikeClient {
         .toList();
   });
 
+  /// Returns database metrics as raw EDN (entity count, attribute count, etc.).
   DatahikeResult<String> metrics(
     DatahikeInput input, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
   }) => _capture(() => _raw.metrics(input, outputFormat: outputFormat));
 
+  /// Returns the current schema definition as raw EDN.
+  ///
+  /// The schema maps attribute keywords to their type/cardinality definitions.
   DatahikeResult<String> schema(
     DatahikeInput input, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
   }) => _capture(() => _raw.schema(input, outputFormat: outputFormat));
 
+  /// Returns the reverse schema — attribute keywords indexed by type.
   DatahikeResult<String> reverseSchema(
     DatahikeInput input, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
   }) => _capture(() => _raw.reverseSchema(input, outputFormat: outputFormat));
 
+  /// Returns the parent commit IDs for the database value.
+  ///
+  /// Useful for traversing the commit graph.
   DatahikeResult<String> parentCommitIds(
     DatahikeInput input, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
   }) => _capture(() => _raw.parentCommitIds(input, outputFormat: outputFormat));
 
+  /// Returns the commit ID of the current database value.
   DatahikeResult<String> commitId(
     DatahikeInput input, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
   }) => _capture(() => _raw.commitId(input, outputFormat: outputFormat));
 
+  /// Returns datoms for the given index (e.g. `:eavt`, `:avet`).
+  ///
+  /// Use [datomsList] to get parsed rows, or [Datom.fromRow] for typed datoms.
   DatahikeResult<String> datoms(
     DatahikeInput input,
     String indexEdn, {
@@ -336,6 +407,7 @@ final class DatahikeClient {
   }) =>
       _capture(() => _raw.datoms(input, indexEdn, outputFormat: outputFormat));
 
+  /// Returns datoms from [indexEdn] onward (seek into an index).
   DatahikeResult<String> seekDatoms(
     DatahikeInput input,
     String indexEdn, {
@@ -344,6 +416,18 @@ final class DatahikeClient {
     () => _raw.seekDatoms(input, indexEdn, outputFormat: outputFormat),
   );
 
+  /// Returns a range of the `:avet` index between [startEdn] and [endEdn].
+  ///
+  /// Useful for scanning attributes by value range.
+  ///
+  /// ```dart
+  /// final result = datahike.indexRange(
+  ///   DatahikeInput.database(config),
+  ///   ':name',
+  ///   '"A"',
+  ///   '"Z"',
+  /// );
+  /// ```
   DatahikeResult<String> indexRange(
     DatahikeInput input,
     String attridEdn,
@@ -360,6 +444,10 @@ final class DatahikeClient {
     ),
   );
 
+  /// Invokes storage garbage collection, removing data before [beforeTx].
+  ///
+  /// **Destructive operation.** Removes historical data older than the given
+  /// transaction timestamp. Use with caution.
   DatahikeResult<String> gcStorage(
     String configEdn,
     DateTime beforeTx, {
@@ -368,11 +456,13 @@ final class DatahikeClient {
     () => _raw.gcStorage(configEdn, beforeTx, outputFormat: outputFormat),
   );
 
+  /// Lists all branch names for the database as raw EDN.
   DatahikeResult<String> branches(
     String configEdn, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
   }) => _capture(() => _raw.branches(configEdn, outputFormat: outputFormat));
 
+  /// Deletes the branch identified by [branchKeywordEdn] (e.g. `:experiment`).
   DatahikeResult<String> deleteBranch(
     String configEdn,
     String branchKeywordEdn, {
@@ -385,6 +475,14 @@ final class DatahikeClient {
     ),
   );
 
+  /// Creates a new branch from an existing commit or branch.
+  ///
+  /// [fromEdn] is an EDN branch keyword (e.g. `:main`) or a commit UUID.
+  /// [newBranchKeywordEdn] is the name for the new branch (e.g. `:experiment`).
+  ///
+  /// ```dart
+  /// final result = datahike.branch(config, ':main', ':experiment');
+  /// ```
   DatahikeResult<String> branch(
     String configEdn,
     String fromEdn,
@@ -399,6 +497,10 @@ final class DatahikeClient {
     ),
   );
 
+  /// Merges [parentsEdn] with transaction data into the database.
+  ///
+  /// [parentsEdn] is an EDN vector of parent commits or branch keywords.
+  /// This is a multi-parent merge operation for combining divergent histories.
   DatahikeResult<String> mergeDb(
     String configEdn,
     String parentsEdn,
@@ -1396,7 +1498,22 @@ String _bareKeywordName(String value) =>
 
 /// A single Datahike datom: `[e a v t]` or `[e a v t added?]`.
 ///
+/// A datom is the atomic unit of Datahike's data model. Each datom
+/// represents one fact: entity [e] has attribute [a] with value [v]
+/// at transaction [t].
+///
 /// Created by parsing the EDN rows returned from [DatahikeClient.datomsList].
+///
+/// ```dart
+/// final result = datahike.datomsList(
+///   DatahikeInput.database(config),
+///   ':eavt',
+/// );
+/// result.match(
+///   (failure) => print('Error: $failure'),
+///   (rows) => rows.map(Datom.fromRow).forEach(print),
+/// );
+/// ```
 final class Datom {
   const Datom({
     required this.e,
@@ -1422,6 +1539,14 @@ final class Datom {
   final bool? added;
 
   /// Parses an EDN datom row into a typed [Datom].
+  ///
+  /// ```dart
+  /// final datom = Datom.fromRow([1, ':name', 'Alice', 1001, true]);
+  /// print(datom.e);    // 1
+  /// print(datom.a);    // ':name'
+  /// print(datom.v);    // 'Alice'
+  /// print(datom.added); // true
+  /// ```
   factory Datom.fromRow(List<Object?> row) {
     return Datom(
       e: row[0] as int,

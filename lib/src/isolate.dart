@@ -57,6 +57,7 @@ final class DatahikeIsolate {
     _isolate.kill();
   }
 
+  /// Creates a database. Async version of [DatahikeClient.createDatabase].
   Future<DatahikeResult<String>> createDatabase(
     String configEdn, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
@@ -65,6 +66,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Deletes a database. Async version of [DatahikeClient.deleteDatabase].
   Future<DatahikeResult<String>> deleteDatabase(
     String configEdn, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
@@ -73,9 +75,11 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Checks if a database exists. Async version of [DatahikeClient.databaseExists].
   Future<DatahikeResult<bool>> databaseExists(String configEdn) =>
       _invoke('databaseExists', {'configEdn': configEdn});
 
+  /// Transacts data into the database. Async version of [DatahikeClient.transact].
   Future<DatahikeResult<String>> transact(
     String configEdn,
     String txData, {
@@ -88,6 +92,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Executes a Datalog query. Async version of [DatahikeClient.q].
   Future<DatahikeResult<String>> q(
     String queryEdn,
     List<DatahikeInput> inputs, {
@@ -106,6 +111,7 @@ final class DatahikeIsolate {
           'outputFormat': outputFormat.nativeName,
         });
 
+  /// Pulls an entity by selector. Async version of [DatahikeClient.pull].
   Future<DatahikeResult<String>> pull(
     DatahikeInput input,
     String selectorEdn,
@@ -119,6 +125,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Pulls multiple entities. Async version of [DatahikeClient.pullMany].
   Future<DatahikeResult<String>> pullMany(
     DatahikeInput input,
     String selectorEdn,
@@ -132,6 +139,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Returns an entity map. Async version of [DatahikeClient.entity].
   Future<DatahikeResult<String>> entity(
     DatahikeInput input,
     int eid, {
@@ -143,6 +151,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Returns datoms for an index. Async version of [DatahikeClient.datoms].
   Future<DatahikeResult<String>> datoms(
     DatahikeInput input,
     String indexEdn, {
@@ -154,6 +163,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Seeks into an index. Async version of [DatahikeClient.seekDatoms].
   Future<DatahikeResult<String>> seekDatoms(
     DatahikeInput input,
     String indexEdn, {
@@ -165,6 +175,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Returns the schema. Async version of [DatahikeClient.schema].
   Future<DatahikeResult<String>> schema(
     DatahikeInput input, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
@@ -174,6 +185,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Returns the reverse schema. Async version of [DatahikeClient.reverseSchema].
   Future<DatahikeResult<String>> reverseSchema(
     DatahikeInput input, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
@@ -183,6 +195,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Returns database metrics. Async version of [DatahikeClient.metrics].
   Future<DatahikeResult<String>> metrics(
     DatahikeInput input, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
@@ -192,6 +205,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Lists branches. Async version of [DatahikeClient.branches].
   Future<DatahikeResult<String>> branches(
     String configEdn, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
@@ -200,6 +214,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Creates a branch. Async version of [DatahikeClient.branch].
   Future<DatahikeResult<String>> branch(
     String configEdn,
     String fromEdn,
@@ -212,6 +227,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Deletes a branch. Async version of [DatahikeClient.deleteBranch].
   Future<DatahikeResult<String>> deleteBranch(
     String configEdn,
     String branchKeywordEdn, {
@@ -222,6 +238,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Returns the commit ID. Async version of [DatahikeClient.commitId].
   Future<DatahikeResult<String>> commitId(
     DatahikeInput input, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
@@ -231,6 +248,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Returns parent commit IDs. Async version of [DatahikeClient.parentCommitIds].
   Future<DatahikeResult<String>> parentCommitIds(
     DatahikeInput input, {
     DatahikeFormat outputFormat = DatahikeFormat.edn,
@@ -240,6 +258,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Returns an index range. Async version of [DatahikeClient.indexRange].
   Future<DatahikeResult<String>> indexRange(
     DatahikeInput input,
     String attridEdn,
@@ -255,6 +274,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Runs garbage collection. Async version of [DatahikeClient.gcStorage].
   Future<DatahikeResult<String>> gcStorage(
     String configEdn,
     DateTime beforeTx, {
@@ -265,6 +285,7 @@ final class DatahikeIsolate {
     'outputFormat': outputFormat.nativeName,
   });
 
+  /// Merges databases. Async version of [DatahikeClient.mergeDb].
   Future<DatahikeResult<String>> mergeDb(
     String configEdn,
     String parentsEdn,
